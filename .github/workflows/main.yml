@@ -47,3 +47,16 @@ jobs:
           git_reference: ${{ github.sha }}
           fuzzing_server_address: ${{ env.FUZZING_SERVER_ADDRESS }}
           dashboard_address: ${{ env.WEB_APP_ADDRESS }}
+      - id: list-findings
+        name: List Findings
+        uses: CodeIntelligenceTesting/github-actions/list-findings@feat_CIFUZZ-528_action_checkApi
+        if: ${{ github.event_name == 'pull_request' && (success() || failure()) }}
+        with:
+            name: "CI Fuzz Findings"
+            test_collection_run: ${{ steps.start-fuzzing.outputs.test_collection_run }}
+            ci-fuzz-api-token: ${{ secrets.CI_FUZZ_API_TOKEN }}
+            serverUrl: ${{env.WEB_APP_ADDRESS}}
+            projectId: "projects/organizations_89d295318b3fded6_zint_git-f0f07698"
+            github-token: ${{ secrets.GITHUB_TOKEN }}
+            owner: ${{ github.event.repository.owner.login }}
+            repository: ${{ github.event.repository.name }}

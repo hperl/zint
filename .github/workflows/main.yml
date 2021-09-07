@@ -8,7 +8,6 @@ env:
   FUZZING_SERVER_ADDRESS: demo.code-intelligence.com:6773
   WEB_APP_ADDRESS:  https://demo.code-intelligence.com
 
-
 jobs:
   fuzz_tests:
     runs-on: ubuntu-latest

@@ -1,4 +1,4 @@
-name: CI Fuzz release test
+name: CI Fuzz
 
 on:
   push:

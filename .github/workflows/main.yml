@@ -18,7 +18,7 @@ jobs:
     steps:
       - id: start-fuzzing
         name: Build and Instrument
-        uses: CodeIntelligenceTesting/github-actions/start-fuzzing@v3
+        uses: CodeIntelligenceTesting/github-actions/start-fuzzing@dev
         with:
           ci_fuzz_api_token: ${{ secrets.CI_FUZZ_FUZZCI_TEST_API_TOKEN }}
           project: ${{ env.PROJECT_ID }}
@@ -26,7 +26,7 @@ jobs:
           fuzzing_server_address: ${{ env.FUZZING_SERVER_ADDRESS }}
       - id: monitor-fuzzing
         name: Fuzzing
-        uses: CodeIntelligenceTesting/github-actions/monitor-fuzzing@v3
+        uses: CodeIntelligenceTesting/github-actions/monitor-fuzzing@dev
         with:
           ci_fuzz_api_token: ${{ secrets.CI_FUZZ_FUZZCI_TEST_API_TOKEN }}
           test_collection_run: ${{ steps.start-fuzzing.outputs.test_collection_run }}
@@ -38,7 +38,7 @@ jobs:
           dashboard_address: ${{ env.WEB_APP_ADDRESS }}
       - id: report-coverage
         name: Report Coverage
-        uses: CodeIntelligenceTesting/github-actions/report-coverage@v3
+        uses: CodeIntelligenceTesting/github-actions/report-coverage@dev
         if: ${{ github.event_name == 'pull_request' && (success() || failure()) }}
         with:
           ci_fuzz_api_token: ${{ secrets.CI_FUZZ_FUZZCI_TEST_API_TOKEN }}
@@ -52,7 +52,7 @@ jobs:
           dashboard_address: ${{ env.WEB_APP_ADDRESS }}
       - id: list-findings
         name: List Findings
-        uses: CodeIntelligenceTesting/github-actions/list-findings@v3
+        uses: CodeIntelligenceTesting/github-actions/list-findings@dev
         if: ${{ github.event_name == 'pull_request' && (success() || failure()) }}
         with:
           name: 'CI Fuzz Findings'

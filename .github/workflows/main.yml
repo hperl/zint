@@ -57,7 +57,7 @@ jobs:
         with:
           name: 'CI Fuzz Findings'
           test_collection_run: ${{ steps.start-fuzzing.outputs.test_collection_run }}
-          ci_fuzz_api_token: ${{ secrets.CI_FUZZ_API_TOKEN }}
+          ci_fuzz_api_token: ${{ secrets.CI_FUZZ_FUZZCI_TEST_API_TOKEN }}
           dashboard_address: ${{env.WEB_APP_ADDRESS}}
           project: ${{env.PROJECT_ID}}
           github_token: ${{ secrets.GITHUB_TOKEN }}

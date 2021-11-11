@@ -1,9 +1,8 @@
 /* pcx.c - Handles output to ZSoft PCX file */
-/* ZSoft PCX File Format Technical Reference Manual http://bespin.org/~qz/pc-gpe/pcx.txt */
 
 /*
     libzint - the open source barcode library
-    Copyright (C) 2009 - 2020 Robin Stuart <rstuart114@gmail.com>
+    Copyright (C) 2009-2017 Robin Stuart <rstuart114@gmail.com>
 
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions
@@ -33,6 +32,7 @@
 /* vim: set ts=4 sw=4 et : */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "common.h"
 #include "pcx.h"        /* PCX header structure */
@@ -43,25 +43,23 @@
 #include <malloc.h>
 #endif
 
+#define SSET	"0123456789ABCDEF"
+
 INTERNAL int pcx_pixel_plot(struct zint_symbol *symbol, char *pixelbuf) {
     int fgred, fggrn, fgblu, bgred, bggrn, bgblu;
     int row, column, i, colour;
     int run_count;
     FILE *pcx_file;
     pcx_header_t header;
-    int bytes_per_line = symbol->bitmap_width + (symbol->bitmap_width & 1); // Must be even
-    unsigned char previous;
 #ifdef _MSC_VER
     unsigned char* rle_row;
 #endif
 
 #ifndef _MSC_VER
-    unsigned char rle_row[bytes_per_line];
+    unsigned char rle_row[symbol->bitmap_width];
 #else
-    rle_row = (unsigned char *) _alloca(bytes_per_line);
+    rle_row = (unsigned char *) _alloca((symbol->bitmap_width * 6) * sizeof (unsigned char));
 #endif /* _MSC_VER */
-
-    rle_row[bytes_per_line - 1] = 0; // Will remain zero if bitmap_width odd
 
     fgred = (16 * ctoi(symbol->fgcolour[0])) + ctoi(symbol->fgcolour[1]);
     fggrn = (16 * ctoi(symbol->fgcolour[2])) + ctoi(symbol->fgcolour[3]);
@@ -89,7 +87,11 @@ INTERNAL int pcx_pixel_plot(struct zint_symbol *symbol, char *pixelbuf) {
     header.reserved = 0;
     header.number_of_planes = 3;
 
-    header.bytes_per_line = bytes_per_line;
+    if (symbol->bitmap_width % 2) {
+        header.bytes_per_line = symbol->bitmap_width + 1;
+    } else {
+        header.bytes_per_line = symbol->bitmap_width;
+    }
 
     header.palette_info = 1; // Colour
     header.horiz_screen_size = 0;
@@ -122,97 +124,46 @@ INTERNAL int pcx_pixel_plot(struct zint_symbol *symbol, char *pixelbuf) {
             for (column = 0; column < symbol->bitmap_width; column++) {
                 switch (colour) {
                     case 0:
-                        switch(pixelbuf[(row * symbol->bitmap_width) + column]) {
-                            case 'W': // White
-                            case 'M': // Magenta
-                            case 'R': // Red
-                            case 'Y': // Yellow
-                                rle_row[column] = 255;
-                                break;
-                            case 'C': // Cyan
-                            case 'B': // Blue
-                            case 'G': // Green
-                            case 'K': // Black
-                                rle_row[column] = 0;
-                                break;
-                            case '1':
-                                rle_row[column] = fgred;
-                                break;
-                            default:
-                                rle_row[column] = bgred;
-                                break;
+                        if (pixelbuf[(row * symbol->bitmap_width) + column] == '1') {
+                            rle_row[column] = fgred;
+                        } else {
+                            rle_row[column] = bgred;
                         }
                         break;
                     case 1:
-                        switch(pixelbuf[(row * symbol->bitmap_width) + column]) {
-                            case 'W': // White
-                            case 'C': // Cyan
-                            case 'Y': // Yellow
-                            case 'G': // Green
-                                rle_row[column] = 255;
-                                break;
-                            case 'B': // Blue
-                            case 'M': // Magenta
-                            case 'R': // Red
-                            case 'K': // Black
-                                rle_row[column] = 0;
-                                break;
-                            case '1':
-                                rle_row[column] = fggrn;
-                                break;
-                            default:
-                                rle_row[column] = bggrn;
-                                break;
+                        if (pixelbuf[(row * symbol->bitmap_width) + column] == '1') {
+                            rle_row[column] = fggrn;
+                        } else {
+                            rle_row[column] = bggrn;
                         }
                         break;
                     case 2:
-                        switch(pixelbuf[(row * symbol->bitmap_width) + column]) {
-                            case 'W': // White
-                            case 'C': // Cyan
-                            case 'B': // Blue
-                            case 'M': // Magenta
-                                rle_row[column] = 255;
-                                break;
-                            case 'R': // Red
-                            case 'Y': // Yellow
-                            case 'G': // Green
-                            case 'K': // Black
-                                rle_row[column] = 0;
-                                break;
-                            case '1':
-                                rle_row[column] = fgblu;
-                                break;
-                            default:
-                                rle_row[column] = bgblu;
-                                break;
+                        if (pixelbuf[(row * symbol->bitmap_width) + column] == '1') {
+                            rle_row[column] = fgblu;
+                        } else {
+                            rle_row[column] = bgblu;
                         }
                         break;
                 }
             }
 
-            /* Based on ImageMagick/coders/pcx.c PCXWritePixels()
-             * Copyright 1999-2020 ImageMagick Studio LLC */
-            previous = rle_row[0];
             run_count = 1;
-            for (column = 1; column < bytes_per_line; column++) { // Note going up to bytes_per_line
-                if ((previous == rle_row[column]) && (run_count < 63)) {
+            for (column = 1; column < symbol->bitmap_width; column++) {
+                if ((rle_row[column - 1] == rle_row[column]) && (run_count < 63)) {
                     run_count++;
                 } else {
-                    if (run_count > 1 || (previous & 0xc0) == 0xc0) {
-                        run_count += 0xc0;
-                        fputc(run_count, pcx_file);
-                    }
-                    fputc(previous, pcx_file);
-                    previous = rle_row[column];
+                    run_count += 0xc0;
+                    fputc(run_count, pcx_file);
+                    fputc(rle_row[column - 1], pcx_file);
                     run_count = 1;
                 }
             }
 
-            if (run_count > 1 || (previous & 0xc0) == 0xc0) {
+            if (run_count > 1) {
                 run_count += 0xc0;
                 fputc(run_count, pcx_file);
+                fputc(rle_row[column - 1], pcx_file);
             }
-            fputc(previous, pcx_file);
         }
     }
 

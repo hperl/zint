@@ -5,15 +5,9 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
-    <height>227</height>
+    <width>423</width>
+    <height>159</height>
    </rect>
-  </property>
-  <property name="maximumSize">
-   <size>
-    <width>600</width>
-    <height>16777215</height>
-   </size>
   </property>
   <property name="windowTitle" >
    <string>Form</string>
@@ -22,22 +16,27 @@
    <item>
     <layout class="QGridLayout" name="gridLayout" >
      <item row="0" column="0" >
-      <widget class="QLabel" name="lavelMQRSize" >
+      <widget class="QRadioButton" name="radMQRAuto" >
        <property name="text" >
-        <string>Size:</string>
+        <string>A&amp;utomatic Resizing</string>
        </property>
-       <property name="buddy">
-        <cstring>cmbMQRSize</cstring>
+       <property name="checked" >
+        <bool>true</bool>
        </property>
       </widget>
      </item>
-     <item row="0" column="1" >
+     <item row="1" column="0" >
+      <widget class="QRadioButton" name="radMQRSize" >
+       <property name="text" >
+        <string>Adjust Si&amp;ze To:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="1" >
       <widget class="QComboBox" name="cmbMQRSize" >
-       <item>
-        <property name="text">
-         <string>Automatic</string>
-        </property>
-       </item>
+       <property name="enabled" >
+        <bool>false</bool>
+       </property>
        <item>
         <property name="text" >
          <string>11 x 11 (Version M1)</string>
@@ -60,23 +59,18 @@
        </item>
       </widget>
      </item>
-     <item row="1" column="0" >
-      <widget class="QLabel" name="labelMQRECC" >
+     <item row="2" column="0" >
+      <widget class="QRadioButton" name="radMQRECC" >
        <property name="text" >
-        <string>Error Correction:</string>
-       </property>
-       <property name="buddy">
-        <cstring>cmbMQRECC</cstring>
+        <string>Add &amp;Error Correction:</string>
        </property>
       </widget>
      </item>
-     <item row="1" column="1" >
+     <item row="2" column="1" >
       <widget class="QComboBox" name="cmbMQRECC" >
-       <item>
-        <property name="text">
-         <string>Automatic</string>
-        </property>
-       </item>
+       <property name="enabled" >
+        <bool>false</bool>
+       </property>
        <item>
         <property name="text" >
          <string>~20% (Level L)</string>
@@ -101,9 +95,6 @@
      <property name="orientation" >
       <enum>Qt::Vertical</enum>
      </property>
-     <property name="sizeType">
-      <enum>QSizePolicy::MinimumExpanding</enum>
-     </property>
      <property name="sizeHint" stdset="0" >
       <size>
        <width>20</width>
@@ -115,5 +106,38 @@
   </layout>
  </widget>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>radMQRSize</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>cmbMQRSize</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel" >
+     <x>98</x>
+     <y>54</y>
+    </hint>
+    <hint type="destinationlabel" >
+     <x>279</x>
+     <y>53</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>radMQRECC</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>cmbMQRECC</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel" >
+     <x>114</x>
+     <y>89</y>
+    </hint>
+    <hint type="destinationlabel" >
+     <x>279</x>
+     <y>89</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>

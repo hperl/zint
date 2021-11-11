@@ -1,6 +1,6 @@
 /*
     libzint - the open source barcode library
-    Copyright (C) 2008-2020 Robin Stuart <rstuart114@gmail.com>
+    Copyright (C) 2008-2019 Robin Stuart <rstuart114@gmail.com>
 
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions
@@ -53,9 +53,6 @@
  * If not, see <https://www.gnu.org/licenses/>.
  */
 #include <string.h>
-#ifdef _MSC_VER
-#include <malloc.h>
-#endif
 #include "common.h"
 #include "gb2312.h"
 #include "gb18030.h"
@@ -2871,8 +2868,8 @@ INTERNAL int gb18030_wctomb_zint(unsigned int* r1, unsigned int* r2, unsigned in
 
 /* Convert UTF-8 string to GB 18030 and place in array of ints */
 INTERNAL int gb18030_utf8tomb(struct zint_symbol *symbol, const unsigned char source[], size_t* p_length, unsigned int* gbdata) {
-    int error_number, ret;
-    unsigned int i, j, length;
+    int i, j, error_number, ret;
+    unsigned int length;
 #ifndef _MSC_VER
     unsigned int utfdata[*p_length + 1];
 #else
@@ -2905,7 +2902,7 @@ INTERNAL int gb18030_utf8tomb(struct zint_symbol *symbol, const unsigned char so
 }
 
 /* Convert UTF-8 string to single byte ECI and place in array of ints */
-INTERNAL int gb18030_utf8tosb(int eci, const unsigned char source[], size_t* p_length, unsigned int* gbdata, int full_multibyte) {
+INTERNAL int gb18030_utf8tosb(int eci, const unsigned char source[], size_t* p_length, unsigned int* gbdata) {
     int error_number;
 #ifndef _MSC_VER
     unsigned char single_byte[*p_length + 1];
@@ -2919,50 +2916,41 @@ INTERNAL int gb18030_utf8tosb(int eci, const unsigned char source[], size_t* p_l
         return error_number;
     }
 
-    gb18030_cpy(single_byte, p_length, gbdata, full_multibyte);
+    gb18030_cpy(single_byte, p_length, gbdata);
 
     return 0;
 }
 
-/* If `full_multibyte` set, copy byte input stream to array of ints, putting double-bytes that match HANXIN Chinese mode in single entry,
- * and quad-bytes in 2 entries. If `full_multibyte` not set, do a straight copy */
-INTERNAL void gb18030_cpy(const unsigned char source[], size_t* p_length, unsigned int* gbdata, int full_multibyte) {
-    unsigned int i, j, length;
-    int done;
+/* Copy byte input stream to array of ints, putting double-bytes that match HANXIN Chinese mode in single entry, and quad-bytes in 2 entries */
+INTERNAL void gb18030_cpy(const unsigned char source[], size_t* p_length, unsigned int* gbdata) {
+    int i, j, done;
+    unsigned int length;
     unsigned char c1, c2, c3, c4;
-
-    if (full_multibyte) {
-        for (i = 0, j = 0, length = *p_length; i < length; i++, j++) {
-            done = 0;
-            c1 = source[i];
-            if (length - i >= 2) {
-                if (c1 >= 0x81 && c1 <= 0xFE) {
-                    c2 = source[i + 1];
-                    if ((c2 >= 0x40 && c2 <= 0x7E) || (c2 >= 0x80 && c2 <= 0xFE)) {
-                        gbdata[j] = (c1 << 8) | c2;
-                        i++;
+    for (i = 0, j = 0, length = *p_length; i < length; i++, j++) {
+        done = 0;
+        c1 = source[i];
+        if (length - i >= 2) {
+            if (c1 >= 0x81 && c1 <= 0xFE) {
+                c2 = source[i + 1];
+                if ((c2 >= 0x40 && c2 <= 0x7E) || (c2 >= 0x80 && c2 <= 0xFE)) {
+                    gbdata[j] = (c1 << 8) | c2;
+                    i++;
+                    done = 1;
+                } else if (length - i >= 4 && (c2 >= 0x30 && c2 <= 0x39)) {
+                    c3 = source[i + 2];
+                    c4 = source[i + 3];
+                    if ((c3 >= 0x81 && c3 <= 0xFE) && (c4 >= 0x30 && c4 <= 0x39)) {
+                        gbdata[j++] = (c1 << 8) | c2;
+                        gbdata[j] = (c3 << 8) | c4;
+                        i += 3;
                         done = 1;
-                    } else if (length - i >= 4 && (c2 >= 0x30 && c2 <= 0x39)) {
-                        c3 = source[i + 2];
-                        c4 = source[i + 3];
-                        if ((c3 >= 0x81 && c3 <= 0xFE) && (c4 >= 0x30 && c4 <= 0x39)) {
-                            gbdata[j++] = (c1 << 8) | c2;
-                            gbdata[j] = (c3 << 8) | c4;
-                            i += 3;
-                            done = 1;
-                        }
                     }
                 }
             }
-            if (!done) {
-                gbdata[j] = c1;
-            }
         }
-        *p_length = j;
-    } else {
-        /* Straight copy */
-        for (i = 0, length = *p_length; i < length; i++) {
-            gbdata[i] = source[i];
+        if (!done) {
+            gbdata[j] = c1;
         }
     }
+    *p_length = j;
 }

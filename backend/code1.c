@@ -2,7 +2,7 @@
 
 /*
     libzint - the open source barcode library
-    Copyright (C) 2009-2020 Robin Stuart <rstuart114@gmail.com>
+    Copyright (C) 2009-2017 Robin Stuart <rstuart114@gmail.com>
 
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions
@@ -36,6 +36,7 @@
 #include "reedsol.h"
 #include "large.h"
 #include <stdio.h>
+#include <string.h>
 #include <math.h>
 
 static void horiz(struct zint_symbol *symbol, int row_no, int full) {
@@ -120,14 +121,10 @@ static int isedi(unsigned char input) {
 static int dq4bi(unsigned char source[], int sourcelen, int position) {
     int i;
 
-    for (i = 0; ((position + i) < sourcelen) && isedi(source[position + i]); i++);
+    for (i = position; isedi(source[position + i]) && ((position + i) < sourcelen); i++);
 
     if ((position + i) == sourcelen) {
         /* Reached end of input */
-        return 0;
-    }
-    if (i == 0) {
-        /* Not EDI */
         return 0;
     }
 
@@ -323,6 +320,7 @@ static int c1_look_ahead_test(unsigned char source[], int sourcelen, int positio
             if (c40_count < edi_count) {
                 best_scheme = C1_C40;
             } else {
+                done = 0;
                 if (c40_count == edi_count) {
                     if (dq4bi(source, sourcelen, position)) {
                         best_scheme = C1_EDI;
@@ -363,6 +361,7 @@ static int c1_encode(struct zint_symbol *symbol, unsigned char source[], unsigne
 
     sp = 0;
     tp = 0;
+    latch = 0;
     memset(c40_buffer, 0, sizeof(*c40_buffer));
     c40_p = 0;
     memset(text_buffer, 0, sizeof(*text_buffer));
@@ -443,7 +442,7 @@ static int c1_encode(struct zint_symbol *symbol, unsigned char source[], unsigne
                 if (j == 13) {
                     latch = 0;
                     for (i = sp + 13; i < length; i++) {
-                        if (!((source[i] >= '0') && (source[i] <= '9'))) {
+                        if (!((source[sp + i] >= '0') && (source[sp + i] <= '9'))) {
                             latch = 1;
                         }
                     }
@@ -456,7 +455,7 @@ static int c1_encode(struct zint_symbol *symbol, unsigned char source[], unsigne
             }
 
             if (next_mode == C1_ASCII) { /* Step B3 */
-                if (istwodigits(source, length, sp)) {
+                if (istwodigits(source, sp) && ((sp + 1) != length)) {
                     target[tp] = (10 * ctoi(source[sp])) + ctoi(source[sp + 1]) + 130;
                     tp++;
                     sp += 2;
@@ -492,7 +491,7 @@ static int c1_encode(struct zint_symbol *symbol, unsigned char source[], unsigne
                             if (j == 7) {
                                 latch = 0;
                                 for (i = sp + 7; i < length; i++) {
-                                    if (!((source[i] >= '0') && (source[i] <= '9'))) {
+                                    if (!((source[sp + i] >= '0') && (source[sp + i] <= '9'))) {
                                         latch = 1;
                                     }
                                 }
@@ -1200,7 +1199,7 @@ INTERNAL int code_one(struct zint_symbol *symbol, unsigned char source[], int le
     if (symbol->option_2 == 9) {
         /* Version S */
         int codewords;
-        large_int elreg;
+        short int elreg[112];
         unsigned int data[15], ecc[15];
         int stream[30];
         int block_width;
@@ -1230,14 +1229,20 @@ INTERNAL int code_one(struct zint_symbol *symbol, unsigned char source[], int le
             block_width = 2;
         }
 
-        large_load_str_u64(&elreg, source, length);
+        binary_load(elreg, (char *) source, length);
 
         for (i = 0; i < 15; i++) {
             data[i] = 0;
             ecc[i] = 0;
         }
 
-        large_uint_array(&elreg, data, codewords, 5 /*bits*/);
+        for (i = 0; i < codewords; i++) {
+            data[codewords - i - 1] += 1 * elreg[(i * 5)];
+            data[codewords - i - 1] += 2 * elreg[(i * 5) + 1];
+            data[codewords - i - 1] += 4 * elreg[(i * 5) + 2];
+            data[codewords - i - 1] += 8 * elreg[(i * 5) + 3];
+            data[codewords - i - 1] += 16 * elreg[(i * 5) + 4];
+        }
 
         rs_init_gf(0x25);
         rs_init_code(codewords, 1);
@@ -1299,17 +1304,14 @@ INTERNAL int code_one(struct zint_symbol *symbol, unsigned char source[], int le
 
     if (symbol->option_2 == 10) {
         /* Version T */
-        unsigned int data[80] = {0}; /* Allow for doubled digits */
-        unsigned int ecc[22];
-        unsigned int stream[60];
+        unsigned int data[40], ecc[25];
+        unsigned int stream[65];
         int data_length;
         int data_cw, ecc_cw, block_width;
 
-        if (length > 80) {
-            strcpy(symbol->errtxt, "519: Input data too long");
-            return ZINT_ERROR_TOO_LONG;
+        for (i = 0; i < 40; i++) {
+            data[i] = 0;
         }
-
         data_length = c1_encode(symbol, source, data, length);
 
         if (data_length == 0) {

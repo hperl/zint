@@ -54,8 +54,6 @@ SOURCES += qrencode/bitstream.c \
 
 HEADERS +=  ../backend/aztec.h \
             ../backend/bmp.h \
-            ../backend/channel_precalcs.h \
-            ../backend/code128.h \
             ../backend/code49.h \
             ../backend/common.h \
             ../backend/composite.h \
@@ -69,7 +67,6 @@ HEADERS +=  ../backend/aztec.h \
             ../backend/hanxin.h \
             ../backend/large.h \
             ../backend/maxicode.h \
-            ../backend/output.h \
             ../backend/pcx.h \
             ../backend/pdf417.h \
             ../backend/reedsol.h \
@@ -107,7 +104,6 @@ SOURCES += ../backend/2of5.c \
            ../backend/mailmark.c \
            ../backend/maxicode.c \
            ../backend/medical.c \
-           ../backend/output.c \
            ../backend/pcx.c \
            ../backend/pdf417.c \
            ../backend/plessey.c \

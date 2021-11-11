@@ -208,10 +208,6 @@ SOURCE=..\backend\medical.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\backend\output.c
-# End Source File
-# Begin Source File
-
 SOURCE=..\backend\pcx.c
 # End Source File
 # Begin Source File

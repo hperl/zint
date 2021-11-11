@@ -6,15 +6,9 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
-    <height>227</height>
+    <width>423</width>
+    <height>159</height>
    </rect>
-  </property>
-  <property name="maximumSize">
-   <size>
-    <width>600</width>
-    <height>16777215</height>
-   </size>
   </property>
   <property name="windowTitle">
    <string>Form</string>
@@ -23,22 +17,27 @@
    <item>
     <layout class="QGridLayout" name="gridLayout">
      <item row="0" column="0">
-      <widget class="QLabel" name="labelGridSize">
+      <widget class="QRadioButton" name="radGridAuto">
        <property name="text">
-        <string>Size:</string>
+        <string>A&amp;utomatic Resizing</string>
        </property>
-       <property name="buddy">
-        <cstring>cmbGridSize</cstring>
+       <property name="checked">
+        <bool>true</bool>
        </property>
       </widget>
      </item>
-     <item row="0" column="1">
+     <item row="1" column="0">
+      <widget class="QRadioButton" name="radGridSize">
+       <property name="text">
+        <string>Adjust Si&amp;ze To:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="1">
       <widget class="QComboBox" name="cmbGridSize">
-       <item>
-        <property name="text">
-         <string>Automatic</string>
-        </property>
-       </item>
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
        <item>
         <property name="text">
          <string>18 x 18 (Version 1)</string>
@@ -106,23 +105,18 @@
        </item>
       </widget>
      </item>
-     <item row="1" column="0">
-      <widget class="QLabel" name="labelGridECC">
+     <item row="2" column="0">
+      <widget class="QRadioButton" name="radGridECC">
        <property name="text">
-        <string>Error Correction:</string>
-       </property>
-       <property name="buddy">
-        <cstring>cmbGridECC</cstring>
+        <string>Add &amp;Error Correction:</string>
        </property>
       </widget>
      </item>
-     <item row="1" column="1">
+     <item row="2" column="1">
       <widget class="QComboBox" name="cmbGridECC">
-       <item>
-        <property name="text">
-         <string>Automatic</string>
-        </property>
-       </item>
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
        <item>
         <property name="text">
          <string>~10%</string>
@@ -153,39 +147,9 @@
     </layout>
    </item>
    <item>
-    <widget class="QLabel" name="noteGridECC">
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
-     <property name="font">
-      <font>
-       <pointsize>9</pointsize>
-      </font>
-     </property>
-     <property name="text">
-      <string>Note: Error Correction is ignored if it is below the minimum available or is too high for a given size.</string>
-     </property>
-     <property name="textFormat">
-      <enum>Qt::PlainText</enum>
-     </property>
-     <property name="alignment">
-      <set>Qt::AlignCenter</set>
-     </property>
-     <property name="wordWrap">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </item>
-   <item>
     <spacer name="verticalSpacer">
      <property name="orientation">
       <enum>Qt::Vertical</enum>
-     </property>
-     <property name="sizeType">
-      <enum>QSizePolicy::MinimumExpanding</enum>
      </property>
      <property name="sizeHint" stdset="0">
       <size>
@@ -198,5 +162,38 @@
   </layout>
  </widget>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>radGridSize</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>cmbGridSize</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>98</x>
+     <y>54</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>279</x>
+     <y>53</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>radGridECC</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>cmbGridECC</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>114</x>
+     <y>89</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>279</x>
+     <y>89</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>

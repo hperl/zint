@@ -1,7 +1,7 @@
 /*  upcean.c - Handles UPC, EAN and ISBN
 
     libzint - the open source barcode library
-    Copyright (C) 2008 - 2020 Robin Stuart <rstuart114@gmail.com>
+    Copyright (C) 2008-2017 Robin Stuart <rstuart114@gmail.com>
 
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions
@@ -30,11 +30,13 @@
  */
 /* vim: set ts=4 sw=4 et : */
 
-#define SODIUM  "0123456789+"
-#define EAN2    102
-#define EAN5    105
+#define SODIUM	"0123456789+"
+#define EAN2	102
+#define EAN5	105
 
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #include "common.h"
 
 /* UPC and EAN tables checked against EN 797:1996 */
@@ -263,10 +265,6 @@ static int upce(struct zint_symbol *symbol, unsigned char source[], char dest[])
 
     check_digit = upc_check(equivalent);
 
-    if (symbol->debug & ZINT_DEBUG_PRINT) {
-        printf("UPC-E: %s, Check digit: %c\n", equivalent, check_digit);
-    }
-
     /* Use the number system and check digit information to choose a parity scheme */
     if (num_system == 1) {
         strcpy(parity, UPCParity1[ctoi(check_digit)]);
@@ -305,15 +303,13 @@ static int upce(struct zint_symbol *symbol, unsigned char source[], char dest[])
 }
 
 /* EAN-2 and EAN-5 add-on codes */
-static void add_on(unsigned char source[], char dest[], int addon_gap) {
+static void add_on(unsigned char source[], char dest[], int mode) {
     char parity[6];
     unsigned int i, code_type;
 
     /* If an add-on then append with space */
-    if (addon_gap != 0) {
-        i = strlen(dest);
-        dest[i] = itoc(addon_gap);
-        dest[i + 1] = '\0';
+    if (mode != 0) {
+        strcat(dest, "9");
     }
 
     /* Start character */
@@ -598,9 +594,6 @@ INTERNAL void ean_leading_zeroes(struct zint_symbol *symbol, unsigned char sourc
         first_part[i + 1] = '\0';
     }
 
-    if (second_len >= 6) { /* Allow 6 (actual max 5) so as to trigger too long error */
-        second_len = 6;
-    }
     for (i = 0; i < second_len; i++) {
         second_part[i] = source[i + first_len + 1];
         second_part[i + 1] = '\0';
@@ -702,11 +695,11 @@ INTERNAL void ean_leading_zeroes(struct zint_symbol *symbol, unsigned char sourc
 
 /* splits string to parts before and after '+' parts */
 INTERNAL int eanx(struct zint_symbol *symbol, unsigned char source[], int src_len) {
-    unsigned char first_part[20] = {0}, second_part[7] = {0}, dest[1000] = {0};
+    unsigned char first_part[20] = {0}, second_part[20] = {0}, dest[1000] = {0};
     unsigned char local_source[20] = {0};
     unsigned int latch, reader, writer, with_addon;
-    int error_number, i, plus_count;
-    int addon_gap = 0;
+    int error_number, i;
+
 
     with_addon = FALSE;
     latch = FALSE;
@@ -717,7 +710,7 @@ INTERNAL int eanx(struct zint_symbol *symbol, unsigned char source[], int src_le
         return ZINT_ERROR_TOO_LONG;
     }
     if (symbol->symbology != BARCODE_ISBNX) {
-        /* ISBN has its own checking routine */
+        /* ISBN has it's own checking routine */
         error_number = is_sane("0123456789+", source, src_len);
         if (error_number == ZINT_ERROR_INVALID_DATA) {
             strcpy(symbol->errtxt, "284: Invalid characters in data");
@@ -730,20 +723,13 @@ INTERNAL int eanx(struct zint_symbol *symbol, unsigned char source[], int src_le
             return error_number;
         }
     }
-    
-    /* Check for multiple '+' characters */
-    plus_count = 0;
-    for (i = 0; i < src_len; i++) {
-        if (source[i] == '+') {
-            plus_count++;
-        }
-    }
-    if (plus_count > 1) {
-        strcpy(symbol->errtxt, "293: Invalid add-on data");
-        return ZINT_ERROR_INVALID_DATA;
-    }
 
     /* Add leading zeroes */
+    ustrcpy(local_source, (unsigned char *) "");
+    if (symbol->symbology == BARCODE_ISBNX) {
+        to_upper(local_source);
+    }
+
     ean_leading_zeroes(symbol, source, local_source);
 
     for (reader = 0; reader < ustrlen(local_source); reader++) {
@@ -772,12 +758,6 @@ INTERNAL int eanx(struct zint_symbol *symbol, unsigned char source[], int src_le
                 writer++;
             }
         } while (reader <= ustrlen(local_source));
-
-        if (symbol->symbology == BARCODE_UPCA || symbol->symbology == BARCODE_UPCA_CHK || symbol->symbology == BARCODE_UPCA_CC) {
-            addon_gap = symbol->option_2 >= 9 && symbol->option_2 <= 12 ? symbol->option_2 : 9;
-        } else {
-            addon_gap = symbol->option_2 >= 7 && symbol->option_2 <= 12 ? symbol->option_2 : 7;
-        }
     } else {
         strcpy((char*) first_part, (char*) local_source);
     }
@@ -898,12 +878,12 @@ INTERNAL int eanx(struct zint_symbol *symbol, unsigned char source[], int src_le
     switch (ustrlen(second_part)) {
         case 0: break;
         case 2:
-            add_on(second_part, (char*) dest, addon_gap);
+            add_on(second_part, (char*) dest, 1);
             strcat((char*) symbol->text, "+");
             strcat((char*) symbol->text, (char*) second_part);
             break;
         case 5:
-            add_on(second_part, (char*) dest, addon_gap);
+            add_on(second_part, (char*) dest, 1);
             strcat((char*) symbol->text, "+");
             strcat((char*) symbol->text, (char*) second_part);
             break;

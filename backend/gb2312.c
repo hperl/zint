@@ -1,6 +1,6 @@
 /*
     libzint - the open source barcode library
-    Copyright (C) 2008-2020 Robin Stuart <rstuart114@gmail.com>
+    Copyright (C) 2008-2019 Robin Stuart <rstuart114@gmail.com>
 
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions
@@ -53,9 +53,6 @@
  * If not, see <https://www.gnu.org/licenses/>.
  */
 #include <string.h>
-#ifdef _MSC_VER
-#include <malloc.h>
-#endif
 #include "common.h"
 #include "gb2312.h"
 
@@ -1504,7 +1501,7 @@ static const Summary16 gb2312_uni2indx_pageff[15] = {
 
 INTERNAL int gb2312_wctomb_zint(unsigned int* r, unsigned int wc) {
     const Summary16 *summary = NULL;
-    if (wc < 0x0460) {
+    if (wc >= 0x0000 && wc < 0x0460) {
         if (wc == 0x00b7) { /* ZINT: Patched to duplicate map to 0xA1A4 */
             *r = 0xA1A4;
             return 2;
@@ -1545,8 +1542,8 @@ INTERNAL int gb2312_wctomb_zint(unsigned int* r, unsigned int wc) {
 
 /* Convert UTF-8 string to GB 2312 (EUC-CN) and place in array of ints */
 INTERNAL int gb2312_utf8tomb(struct zint_symbol *symbol, const unsigned char source[], size_t* p_length, unsigned int* gbdata) {
-    int error_number;
-    unsigned int i, length;
+    int i, error_number;
+    unsigned int length;
 #ifndef _MSC_VER
     unsigned int utfdata[*p_length + 1];
 #else
@@ -1573,7 +1570,7 @@ INTERNAL int gb2312_utf8tomb(struct zint_symbol *symbol, const unsigned char sou
 }
 
 /* Convert UTF-8 string to single byte ECI and place in array of ints */
-INTERNAL int gb2312_utf8tosb(int eci, const unsigned char source[], size_t* p_length, unsigned int* gbdata, int full_multibyte) {
+INTERNAL int gb2312_utf8tosb(int eci, const unsigned char source[], size_t* p_length, unsigned int* gbdata) {
     int error_number;
 #ifndef _MSC_VER
     unsigned char single_byte[*p_length + 1];
@@ -1587,38 +1584,30 @@ INTERNAL int gb2312_utf8tosb(int eci, const unsigned char source[], size_t* p_le
         return error_number;
     }
 
-    gb2312_cpy(single_byte, p_length, gbdata, full_multibyte);
+    gb2312_cpy(single_byte, p_length, gbdata);
 
     return 0;
 }
 
-/* If `full_multibyte` set, copy byte input stream to array of ints, putting double-bytes that match GRIDMATRIX Chinese mode in a single entry.
- * If `full_multibyte` not set, do a straight copy */
-INTERNAL void gb2312_cpy(const unsigned char source[], size_t* p_length, unsigned int* gbdata, int full_multibyte) {
-    unsigned int i, j, length;
+/* Copy byte input stream to array of ints, putting double-bytes that match GRIDMATRIX Chinese mode in single entry */
+INTERNAL void gb2312_cpy(const unsigned char source[], size_t* p_length, unsigned int* gbdata) {
+    int i, j;
+    unsigned int length;
     unsigned char c1, c2;
-
-    if (full_multibyte) {
-        for (i = 0, j = 0, length = *p_length; i < length; i++, j++) {
-            if (length - i >= 2) {
-                c1 = source[i];
-                c2 = source[i + 1];
-                if (((c1 >= 0xA1 && c1 <= 0xA9) || (c1 >= 0xB0 && c1 <= 0xF7)) && c2 >= 0xA1 && c2 <= 0xFE) {
-                    /* This may or may not be valid GB 2312 (EUC-CN), but don't care as long as it can be encoded in GRIDMATRIX Chinese mode */
-                    gbdata[j] = (c1 << 8) | c2;
-                    i++;
-                } else {
-                    gbdata[j] = c1;
-                }
+    for (i = 0, j = 0, length = *p_length; i < length; i++, j++) {
+        if (length - i >= 2) {
+            c1 = source[i];
+            c2 = source[i + 1];
+            if (((c1 >= 0xA1 && c1 <= 0xA9) || (c1 >= 0xB0 && c1 <= 0xF7)) && c2 >= 0xA1 && c2 <= 0xFE) {
+                /* This may or may not be valid GB 2312 (EUC-CN), but don't care as long as it can be encoded in GRIDMATRIX Chinese mode */
+                gbdata[j] = (c1 << 8) | c2;
+                i++;
             } else {
-                gbdata[j] = source[i];
+                gbdata[j] = c1;
             }
-        }
-        *p_length = j;
-    } else {
-        /* Straight copy */
-        for (i = 0, length = *p_length; i < length; i++) {
-            gbdata[i] = source[i];
+        } else {
+            gbdata[j] = source[i];
         }
     }
+    *p_length = j;
 }

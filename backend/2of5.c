@@ -2,7 +2,7 @@
 
 /*
     libzint - the open source barcode library
-    Copyright (C) 2008 - 2020 Robin Stuart <rstuart114@gmail.com>
+    Copyright (C) 2008-2017 Robin Stuart <rstuart114@gmail.com>
 
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions
@@ -31,7 +31,9 @@
  */
 /* vim: set ts=4 sw=4 et : */
 
+#include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "common.h"
 #ifdef _MSC_VER
 #include <malloc.h>
@@ -201,19 +203,19 @@ INTERNAL int interleaved_two_of_five(struct zint_symbol *symbol, const unsigned 
         return error_number;
     }
 
-    ustrcpy(temp, "");
+    ustrcpy(temp, (unsigned char *) "");
     /* Input must be an even number of characters for Interlaced 2 of 5 to work:
        if an odd number of characters has been entered then add a leading zero */
     if (length & 1) {
-        ustrcpy(temp, "0");
+        ustrcpy(temp, (unsigned char *) "0");
         length++;
     }
-    ustrcat(temp, source);
+    strcat((char*) temp, (char*) source);
 
     /* start character */
     strcpy(dest, "1111");
 
-    for (i = 0; i < (int) length; i += 2) {
+    for (i = 0; i < length; i += 2) {
         int k = 0;
         /* look up the bars and the spaces and put them in two strings */
         strcpy(bars, "");
@@ -265,7 +267,7 @@ INTERNAL int itf14(struct zint_symbol *symbol, unsigned char source[], int lengt
     for (i = 0; i < zeroes; i++) {
         localstr[i] = '0';
     }
-    ustrcpy(localstr + zeroes, source);
+    strcpy(localstr + zeroes, (char *) source);
 
     /* Calculate the check digit - the same method used for EAN-13 */
     for (i = 12; i >= 0; i--) {
@@ -278,17 +280,7 @@ INTERNAL int itf14(struct zint_symbol *symbol, unsigned char source[], int lengt
     localstr[13] = check_digit(count);
     localstr[14] = '\0';
     error_number = interleaved_two_of_five(symbol, (unsigned char *) localstr, strlen(localstr));
-    ustrcpy(symbol->text, localstr);
-
-    if (!((symbol->output_options & BARCODE_BOX) || (symbol->output_options & BARCODE_BIND))) {
-        // If no option has been selected then uses default box option
-        symbol->output_options |= BARCODE_BOX;
-        if (symbol->border_width == 0) { /* Allow override if non-zero */
-            /* GS1 General Specifications 20.0 Sections 5.3.2.4 & 5.3.6 (4.83 / 1.016 ~ 4.75) */
-            symbol->border_width = 5; /* Note change from previous value 8 */
-        }
-    }
-
+    ustrcpy(symbol->text, (unsigned char*) localstr);
     return error_number;
 }
 
@@ -313,7 +305,7 @@ INTERNAL int dpleit(struct zint_symbol *symbol, unsigned char source[], int leng
     zeroes = 13 - length;
     for (i = 0; i < zeroes; i++)
         localstr[i] = '0';
-    ustrcpy(localstr + zeroes, source);
+    strcpy(localstr + zeroes, (char *) source);
 
     for (i = 12; i >= 0; i--) {
         count += 4 * ctoi(localstr[i]);
@@ -325,7 +317,7 @@ INTERNAL int dpleit(struct zint_symbol *symbol, unsigned char source[], int leng
     localstr[13] = check_digit(count);
     localstr[14] = '\0';
     error_number = interleaved_two_of_five(symbol, (unsigned char *) localstr, strlen(localstr));
-    ustrcpy(symbol->text, localstr);
+    ustrcpy(symbol->text, (unsigned char*) localstr);
     return error_number;
 }
 
@@ -349,7 +341,7 @@ INTERNAL int dpident(struct zint_symbol *symbol, unsigned char source[], int len
     zeroes = 11 - length;
     for (i = 0; i < zeroes; i++)
         localstr[i] = '0';
-    ustrcpy(localstr + zeroes, source);
+    strcpy(localstr + zeroes, (char *) source);
 
     for (i = 10; i >= 0; i--) {
         count += 4 * ctoi(localstr[i]);
@@ -361,6 +353,6 @@ INTERNAL int dpident(struct zint_symbol *symbol, unsigned char source[], int len
     localstr[11] = check_digit(count);
     localstr[12] = '\0';
     error_number = interleaved_two_of_five(symbol, (unsigned char *) localstr, strlen(localstr));
-    ustrcpy(symbol->text, localstr);
+    ustrcpy(symbol->text, (unsigned char*) localstr);
     return error_number;
 }

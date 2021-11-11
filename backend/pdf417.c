@@ -1,7 +1,7 @@
 /* pdf417.c - Handles PDF417 stacked symbology */
 
 /*  Zint - A barcode generating program using libpng
-    Copyright (C) 2008-2020 Robin Stuart <rstuart114@gmail.com>
+    Copyright (C) 2008-2017 Robin Stuart <rstuart114@gmail.com>
     Portions Copyright (C) 2004 Grandzebu
     Bug Fixes thanks to KL Chin <klchin@users.sourceforge.net>
 
@@ -43,6 +43,8 @@
    number of codeword columns not including row start and end data) */
 
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #include <math.h>
 #ifndef _MSC_VER
 #include <stdint.h>
@@ -80,8 +82,7 @@ static const char MicroAutosize[56] = {
     1, 14, 2, 7, 3, 25, 8, 16, 5, 17, 9, 6, 10, 11, 28, 12, 19, 13, 29, 20, 30, 21, 22, 31, 23, 32, 33, 34
 };
 
-#define PDF417_MAX_LEN          2710    /* ISO/IEC 15438:2015 5.1.1 c) 3) Max possible number of characters at error correction level 0 (Numeric Compaction mode) */
-#define MICRO_PDF417_MAX_LEN    366     /* ISO/IEC 24728:2006 5.1.1 c) 3) Max possible number of characters (Numeric Compaction mode) */
+static int liste[2][1000]; /* global */
 
 /* 866 */
 
@@ -99,7 +100,7 @@ static int quelmode(char codeascii) {
 }
 
 /* 844 */
-static void regroupe(int liste[2][PDF417_MAX_LEN], int *indexliste) {
+static void regroupe(int *indexliste) {
 
     /* bring together same type blocks */
     if (*(indexliste) > 1) {
@@ -127,7 +128,7 @@ static void regroupe(int liste[2][PDF417_MAX_LEN], int *indexliste) {
 }
 
 /* 478 */
-static void pdfsmooth(int liste[2][PDF417_MAX_LEN], int *indexliste) {
+static void pdfsmooth(int *indexliste) {
     int i, crnt, last, next, length;
 
     for (i = 0; i < *(indexliste); i++) {
@@ -183,7 +184,7 @@ static void pdfsmooth(int liste[2][PDF417_MAX_LEN], int *indexliste) {
             }
         }
     }
-    regroupe(liste, indexliste);
+    regroupe(indexliste);
     /* 520 */
     for (i = 0; i < *(indexliste); i++) {
         crnt = liste[1][i];
@@ -219,15 +220,18 @@ static void pdfsmooth(int liste[2][PDF417_MAX_LEN], int *indexliste) {
         }
     }
     /* 540 */
-    regroupe(liste, indexliste);
+    regroupe(indexliste);
 }
 
 /* 547 */
-static void textprocess(int *chainemc, int *mclength, char chaine[], int start, int length, int is_micro) {
-    int j, indexlistet, curtable, listet[2][PDF417_MAX_LEN] = {{0}}, chainet[PDF417_MAX_LEN], wnet;
+static void textprocess(int *chainemc, int *mclength, char chaine[], int start, int length) {
+    int j, indexlistet, curtable, listet[2][5000], chainet[5000], wnet;
 
     wnet = 0;
 
+    for (j = 0; j < 1000; j++) {
+        listet[0][j] = 0;
+    }
     /* listet will contain the table numbers and the value of each characters */
     for (indexlistet = 0; indexlistet < length; indexlistet++) {
         char codeascii = chaine[start + indexlistet];
@@ -397,23 +401,22 @@ static void textprocess(int *chainemc, int *mclength, char chaine[], int start, 
         wnet++;
     }
     /* Now translate the string chainet into codewords */
-
-    /* Default mode for PDF417 is Text Compaction Alpha (ISO/IEC 1543:2015 5.4.2.1), and for MICROPDF417 is Byte Compaction
-     * (ISO/IEC 24728:2006 5.4.3), so only add flag if not first codeword or is MICROPDF417 */
-    if (*mclength || is_micro) {
-        chainemc[(*mclength)++] = 900;
-    }
+    chainemc[*(mclength)] = 900;
+    *(mclength) = *(mclength) + 1;
 
     for (j = 0; j < wnet; j += 2) {
         int cw_number;
 
         cw_number = (30 * chainet[j]) + chainet[j + 1];
-        chainemc[(*mclength)++] = cw_number;
+        chainemc[*(mclength)] = cw_number;
+        *(mclength) = *(mclength) + 1;
+
     }
 }
 
 /* 671 */
-INTERNAL void byteprocess(int *chainemc, int *mclength, unsigned char chaine[], int start, int length, int debug) {
+INTERNAL void byteprocess(int *chainemc, int *mclength, unsigned char chaine[], int start, int length) {
+    int debug = 0;
 
     if (debug) printf("\nEntering byte mode at position %d\n", start);
 
@@ -430,8 +433,6 @@ INTERNAL void byteprocess(int *chainemc, int *mclength, unsigned char chaine[], 
             chainemc[(*mclength)++] = 924;
             if (debug) printf("924 ");
         } else {
-            /* Default mode for MICROPDF417 is Byte Compaction (ISO/IEC 24728:2006 5.4.3), but not emitting it depends on whether
-             * an ECI has been emitted previously (or not) it appears, so simpler and safer to always emit it. */
             chainemc[(*mclength)++] = 901;
             if (debug) printf("901 ");
         }
@@ -439,26 +440,39 @@ INTERNAL void byteprocess(int *chainemc, int *mclength, unsigned char chaine[], 
         len = 0;
 
         while (len < length) {
-            uint64_t total;
+			uint64_t total;
             unsigned int chunkLen = length - len;
-            if (6 <= chunkLen) { /* Take groups of 6 */
+            if (6 <= chunkLen) /* Take groups of 6 */ {
                 chunkLen = 6;
                 len += chunkLen;
+#if defined(_MSC_VER) && _MSC_VER == 1200
                 total = 0;
+#else
+                total = 0ULL;
+#endif
 
                 while (chunkLen--) {
                     uint64_t mantisa = chaine[start++];
-                    total |= mantisa << (chunkLen * 8);
+#if defined(_MSC_VER) && _MSC_VER == 1200
+                    total |= mantisa << (uint64_t) (chunkLen * 8);
+#else
+                    total |= mantisa << (uint64_t) (chunkLen * 8ULL);
+#endif
                 }
 
                 chunkLen = 5;
 
                 while (chunkLen--) {
+#if defined(_MSC_VER) && _MSC_VER == 1200
                     chainemc[*mclength + chunkLen] = (int) (total % 900);
                     total /= 900;
+#else
+                    chainemc[*mclength + chunkLen] = (int) (total % 900ULL);
+                    total /= 900ULL;
+#endif
                 }
                 *mclength += 5;
-            } else { /* If there remains a group of less than 6 bytes */
+            } else /*  If it remain a group of less than 6 bytes   */ {
                 len += chunkLen;
                 while (chunkLen--) {
                     chainemc[(*mclength)++] = chaine[start++];
@@ -470,12 +484,16 @@ INTERNAL void byteprocess(int *chainemc, int *mclength, unsigned char chaine[], 
 
 /* 712 */
 static void numbprocess(int *chainemc, int *mclength, char chaine[], int start, int length) {
-    int j, loop, dummy[50] = {0}, diviseur, nombre;
+    int j, loop, dummy[100], diviseur, nombre;
     char chainemod[50], chainemult[100], temp;
 
     strcpy(chainemod, "");
+    for (loop = 0; loop <= 50; loop++) {
+        dummy[loop] = 0;
+    }
 
-    chainemc[(*mclength)++] = 902;
+    chainemc[*(mclength)] = 902;
+    *(mclength) = *(mclength) + 1;
 
     j = 0;
     while (j < length) {
@@ -500,7 +518,7 @@ static void numbprocess(int *chainemc, int *mclength, char chaine[], int start, 
             while (strlen(chainemod) != 0) {
                 nombre *= 10;
                 nombre += ctoi(chainemod[0]);
-                for (loop = 0; loop < (int)strlen(chainemod); loop++) {
+                for (loop = 0; loop < strlen(chainemod); loop++) {
                     chainemod[loop] = chainemod[loop + 1];
                 }
                 if (nombre < diviseur) {
@@ -525,7 +543,8 @@ static void numbprocess(int *chainemc, int *mclength, char chaine[], int start, 
             strcpy(chainemod, chainemult);
         } while (strlen(chainemult) != 0);
         for (loop = 0; loop < dumlength; loop++) {
-            chainemc[(*mclength)++] = dummy[loop];
+            chainemc[*(mclength)] = dummy[loop];
+            *(mclength) = *(mclength) + 1;
         }
         j += longueur;
     }
@@ -534,15 +553,9 @@ static void numbprocess(int *chainemc, int *mclength, char chaine[], int start, 
 /* 366 */
 static int pdf417(struct zint_symbol *symbol, unsigned char chaine[], const size_t length) {
     int i, k, j, indexchaine, indexliste, mode, longueur, loop, mccorrection[520], offset;
-    int total, chainemc[PDF417_MAX_LEN], mclength, c1, c2, c3, dummy[35], calcheight;
-    int liste[2][PDF417_MAX_LEN] = {{0}};
+    int total, chainemc[2700], mclength, c1, c2, c3, dummy[35], calcheight;
     char pattern[580];
-    int debug = symbol->debug & ZINT_DEBUG_PRINT;
-
-    if (length > PDF417_MAX_LEN) {
-        strcpy(symbol->errtxt, "463: Input string too long");
-        return ZINT_ERROR_TOO_LONG;
-    }
+    int debug = symbol->debug;
 
     /* 456 */
     indexliste = 0;
@@ -550,19 +563,23 @@ static int pdf417(struct zint_symbol *symbol, unsigned char chaine[], const size
 
     mode = quelmode(chaine[indexchaine]);
 
+    for (i = 0; i < 1000; i++) {
+        liste[0][i] = 0;
+    }
+
     /* 463 */
     do {
         liste[1][indexliste] = mode;
-        while ((liste[1][indexliste] == mode) && (indexchaine < (int)length)) {
+        while ((liste[1][indexliste] == mode) && (indexchaine < length)) {
             liste[0][indexliste]++;
             indexchaine++;
             mode = quelmode(chaine[indexchaine]);
         }
         indexliste++;
-    } while (indexchaine < (int)length);
+    } while (indexchaine < length);
 
     /* 474 */
-    pdfsmooth(liste, &indexliste);
+    pdfsmooth(&indexliste);
 
     if (debug) {
         printf("Initial block pattern:\n");
@@ -622,10 +639,10 @@ static int pdf417(struct zint_symbol *symbol, unsigned char chaine[], const size
     for (i = 0; i < indexliste; i++) {
         switch (liste[1][i]) {
             case TEX: /* 547 - text mode */
-                textprocess(chainemc, &mclength, (char*) chaine, indexchaine, liste[0][i], 0 /*is_micro*/);
+                textprocess(chainemc, &mclength, (char*) chaine, indexchaine, liste[0][i]);
                 break;
             case BYT: /* 670 - octet stream mode */
-                byteprocess(chainemc, &mclength, chaine, indexchaine, liste[0][i], debug);
+                byteprocess(chainemc, &mclength, chaine, indexchaine, liste[0][i]);
                 break;
             case NUM: /* 712 - numeric mode */
                 numbprocess(chainemc, &mclength, (char*) chaine, indexchaine, liste[0][i]);
@@ -676,13 +693,11 @@ static int pdf417(struct zint_symbol *symbol, unsigned char chaine[], const size
 
     if (longueur + k > 928) {
         /* Enforce maximum codeword limit */
-        strcpy(symbol->errtxt, "464: Input string too long");
-        return ZINT_ERROR_TOO_LONG;
+        return 2;
     }
 
     if (((longueur + k) / symbol->option_2) > 90) {
-        strcpy(symbol->errtxt, "465: Data too long for specified number of columns");
-        return ZINT_ERROR_TOO_LONG;
+        return 4;
     }
 
     /* 781 - Padding calculation */
@@ -734,6 +749,7 @@ static int pdf417(struct zint_symbol *symbol, unsigned char chaine[], const size
     for (loop = 0; loop < 520; loop++) {
         mccorrection[loop] = 0;
     }
+    total = 0;
     for (i = 0; i < longueur; i++) {
         total = (chainemc[i] + mccorrection[k - 1]) % 929;
         for (j = k - 1; j > 0; j--) {
@@ -754,11 +770,6 @@ static int pdf417(struct zint_symbol *symbol, unsigned char chaine[], const size
         }
         printf("\n");
     }
-#ifdef ZINT_TEST
-    if (symbol->debug & ZINT_DEBUG_TEST) {
-        debug_test_codeword_dump_int(symbol, chainemc, mclength);
-    }
-#endif
 
     /* 818 - The CW string is finished */
     c1 = (mclength / symbol->option_2 - 1) / 3;
@@ -796,15 +807,13 @@ static int pdf417(struct zint_symbol *symbol, unsigned char chaine[], const size
             strcat(pattern, "0");
         }
 
-        if (symbol->symbology != BARCODE_PDF417COMP) {
+        if (symbol->symbology != BARCODE_PDF417TRUNC) {
             bin_append(pdf_bitpattern[offset + dummy[j]], 16, pattern);
             strcat(pattern, "0");
             bin_append(0x3FA29, 18, pattern); /* Row Stop */
-        } else {
-            strcat(pattern, "1"); /* Compact PDF417 Stop pattern */
         }
 
-        for (loop = 0; loop < (int)strlen(pattern); loop++) {
+        for (loop = 0; loop < strlen(pattern); loop++) {
             if (pattern[loop] == '1') {
                 set_module(symbol, i, loop);
             }
@@ -850,7 +859,31 @@ INTERNAL int pdf417enc(struct zint_symbol *symbol, unsigned char source[], const
 
     /* 352 */
     if (codeerr != 0) {
-        error_number = codeerr;
+        switch (codeerr) {
+            case 1:
+                strcpy(symbol->errtxt, "462: No such file or file unreadable");
+                error_number = ZINT_ERROR_INVALID_OPTION;
+                break;
+            case 2:
+                strcpy(symbol->errtxt, "463: Input string too long");
+                error_number = ZINT_ERROR_TOO_LONG;
+                break;
+            case 3:
+                strcpy(symbol->errtxt, "464: Number of codewords per row too small");
+                error_number = ZINT_WARN_INVALID_OPTION;
+                break;
+            case 4:
+                strcpy(symbol->errtxt, "465: Data too long for specified number of columns");
+                error_number = ZINT_ERROR_TOO_LONG;
+                break;
+            case ZINT_ERROR_INVALID_OPTION:
+                error_number = codeerr;
+                break;
+            default:
+                strcpy(symbol->errtxt, "466: Something strange happened");
+                error_number = ZINT_ERROR_ENCODING_PROBLEM;
+                break;
+        }
     }
 
     /* 364 */
@@ -860,17 +893,11 @@ INTERNAL int pdf417enc(struct zint_symbol *symbol, unsigned char source[], const
 /* like PDF417 only much smaller! */
 INTERNAL int micro_pdf417(struct zint_symbol *symbol, unsigned char chaine[], const size_t length) {
     int i, k, j, indexchaine, indexliste, mode, longueur, mccorrection[50], offset;
-    int total, chainemc[PDF417_MAX_LEN], mclength, dummy[5], codeerr;
-    int liste[2][PDF417_MAX_LEN] = {{0}};
+    int total, chainemc[2700], mclength, dummy[5], codeerr;
     char pattern[580];
     int variant, LeftRAPStart, CentreRAPStart, RightRAPStart, StartCluster;
     int LeftRAP, CentreRAP, RightRAP, Cluster, loop, calcheight;
-    int debug = symbol->debug & ZINT_DEBUG_PRINT;
-
-    if (length > MICRO_PDF417_MAX_LEN) {
-        strcpy(symbol->errtxt, "474: Input data too long");
-        return ZINT_ERROR_TOO_LONG;
-    }
+    int debug = 0;
 
     /* Encoding starts out the same as PDF417, so use the same code */
     codeerr = 0;
@@ -881,19 +908,23 @@ INTERNAL int micro_pdf417(struct zint_symbol *symbol, unsigned char chaine[], co
 
     mode = quelmode(chaine[indexchaine]);
 
+    for (i = 0; i < 1000; i++) {
+        liste[0][i] = 0;
+    }
+
     /* 463 */
     do {
         liste[1][indexliste] = mode;
-        while ((liste[1][indexliste] == mode) && (indexchaine < (int)length)) {
+        while ((liste[1][indexliste] == mode) && (indexchaine < length)) {
             liste[0][indexliste]++;
             indexchaine++;
             mode = quelmode(chaine[indexchaine]);
         }
         indexliste++;
-    } while (indexchaine < (int)length);
+    } while (indexchaine < length);
 
     /* 474 */
-    pdfsmooth(liste, &indexliste);
+    pdfsmooth(&indexliste);
 
     if (debug) {
         printf("Initial mapping:\n");
@@ -953,10 +984,10 @@ INTERNAL int micro_pdf417(struct zint_symbol *symbol, unsigned char chaine[], co
     for (i = 0; i < indexliste; i++) {
         switch (liste[1][i]) {
             case TEX: /* 547 - text mode */
-                textprocess(chainemc, &mclength, (char*) chaine, indexchaine, liste[0][i], 1 /*is_micro*/);
+                textprocess(chainemc, &mclength, (char*) chaine, indexchaine, liste[0][i]);
                 break;
             case BYT: /* 670 - octet stream mode */
-                byteprocess(chainemc, &mclength, chaine, indexchaine, liste[0][i], debug);
+                byteprocess(chainemc, &mclength, chaine, indexchaine, liste[0][i]);
                 break;
             case NUM: /* 712 - numeric mode */
                 numbprocess(chainemc, &mclength, (char*) chaine, indexchaine, liste[0][i]);
@@ -980,7 +1011,7 @@ INTERNAL int micro_pdf417(struct zint_symbol *symbol, unsigned char chaine[], co
     if (debug) {
         printf("\nEncoded Data Stream:\n");
         for (i = 0; i < mclength; i++) {
-            printf("%3d ", chainemc[i]);
+            printf("0x%02X ", chainemc[i]);
         }
         printf("\n");
     }
@@ -1158,6 +1189,7 @@ INTERNAL int micro_pdf417(struct zint_symbol *symbol, unsigned char chaine[], co
     for (loop = 0; loop < 50; loop++) {
         mccorrection[loop] = 0;
     }
+    total = 0;
     for (i = 0; i < longueur; i++) {
         total = (chainemc[i] + mccorrection[k - 1]) % 929;
         for (j = k - 1; j >= 0; j--) {
@@ -1183,15 +1215,10 @@ INTERNAL int micro_pdf417(struct zint_symbol *symbol, unsigned char chaine[], co
     if (debug) {
         printf("Encoded Data Stream with ECC:\n");
         for (i = 0; i < mclength; i++) {
-            printf("%3d ", chainemc[i]);
+            printf("0x%02X ", chainemc[i]);
         }
         printf("\n");
     }
-#ifdef ZINT_TEST
-    if (symbol->debug & ZINT_DEBUG_TEST) {
-        debug_test_codeword_dump_int(symbol, chainemc, mclength);
-    }
-#endif
 
     /* Now get the RAP (Row Address Pattern) start values */
     LeftRAPStart = RAPTable[variant];
@@ -1247,7 +1274,7 @@ INTERNAL int micro_pdf417(struct zint_symbol *symbol, unsigned char chaine[], co
         if (debug) printf("%s\n", pattern);
 
         /* so now pattern[] holds the string of '1's and '0's. - copy this to the symbol */
-        for (loop = 0; loop < (int)strlen(pattern); loop++) {
+        for (loop = 0; loop < strlen(pattern); loop++) {
             if (pattern[loop] == '1') {
                 set_module(symbol, i, loop);
             }

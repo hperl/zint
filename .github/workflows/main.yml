@@ -4,7 +4,7 @@ on:
   push:
     branches: [ release-test ]
   pull_request:
-    branches: [ release-test ]
+    branches: [ master ]
 
 env:
   FUZZING_SERVER_ADDRESS: release-cicd-test.code-intelligence.com:6773

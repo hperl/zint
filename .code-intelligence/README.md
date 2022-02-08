@@ -1,5 +1,6 @@
 # Fuzzing the Zint barcode encoder
 
+
 ## What is Zint?
 
 Zint is a suite of programs to allow easy encoding of data in any of the wide
